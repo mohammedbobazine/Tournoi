@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include "../fonctions/headers/fonctionsTCP.h"
+#include "time.h"
 
 #include "../headers/protocol.h"
 #include "../headers/validation.h"
@@ -232,9 +233,180 @@ int main(int argc, char** argv) {
     int NbrePartie = 1;//numero de la partie
     initialiserPartie();
     printf("----------- Debut de la premier partie ---------------\n6|\n|\n|\n|\n|-------------------------------------------------------- \n");
+    
+    
+    int theTime;
+    
+    TCoupReq couprequete;
+    TCoupRep coupreponse;
+    fd_set readSet1;
+    TPropCoup propCoup;
+
+    /* intialisation du score de chaque joueur */
+    int joueur1Nbperte = 0;
+    int joueur1Nbgagne = 0;
+    int joueur2Nbperte = 0;
+    int joueur2Nbgagne = 0;
+    int joueur1NULLE = 0;
+    int joueur2NULLE = 0;
+
+
+    
+    while (NbrePartie == 1) {
+
+        /*time 6 seconde*/
+        struct timeval tval1;
+        tval1.tv_sec = TIME_MAX; // Number of whole seconds of elapsed time
+        tval1.tv_usec = 0;// Number of microseconds of rest of elapsed time minus tv_sec. Always less
+        
+        FD_ZERO(&readSet1);
+        FD_SET(Trans1, &readSet1);
+        /*Pour le timeout*/
+        theTime = select(Trans1 + 1, &readSet1, NULL, NULL, &tval1);
+
+        if (theTime > 0) {
+            /* pour connaitre le type de requete*/
+            err = recv(Trans1, &type_requete, sizeof(TIdRequest), MSG_PEEK);
+
+            switch (type_requete)
+            {
+                /* le cas ou la requete est de type COUP*/
+            case COUP:
+                
+                err = recv(Trans1, &couprequete, sizeof(TCoupReq), 0);
+
+                if (err<0)
+                {
+                    perror("(serveur) erreur sur la reception du coup sur Trans1\n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+
+                }
+                printf("(serveur) reception  -COUP- du joueur 1 [BLANC] ..\n");
+
+                bool validcoup = validationCoup(1, couprequete, &propCoup);
+
+                if (validcoup == false ) {
+                    coupreponse.err = ERR_COUP;
+                    coupreponse.validCoup = TRICHE;
+                    coupreponse.propCoup = PERDU;
+
+                    err = send(Trans1, &coupreponse, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        perror("(serveur) erreur sur le send Trans1 \n");
+                        shutdown(Trans1, SHUT_RDWR);
+                        close(Trans1);
+                        return -5;
+                    }
+                    /*
+                    *envi pour le 2eme joueur
+                    */
+                    err = send(Trans2, &coupreponse, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        perror("(serveur) erreur sur le send Trans2 \n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+                    /*mise a jour du score et passage a la deuxieme partie*/
+                    joueur1Nbperte++;
+                    joueur2Nbgagne++;
+                    NbrePartie++;
+                    /*sortir dans le cas la perte*/
+                    break;
+                }
+                /* si le coup est valid alors..*/
+                else {
+                    printf("********************\n(serveur) COUP [valid]\n ********************\n");
+                    coupreponse.err = ERR_OK;
+                    coupreponse.validCoup = VALID;
+                    coupreponse.propCoup = propCoup;
+
+
+                }
+                err = send(Trans1, &coupreponse, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    perror("(serveur) erreur sur le send Trans1 \n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+                }
+                /*
+                *envi pour le 2eme joueur
+                */
+                err = send(Trans2, &coupreponse, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    perror("(serveur) erreur sur le send Trans2 \n");
+                    shutdown(Trans2, SHUT_RDWR);
+                    close(Trans2);
+                    return -5;
+                }
+                /*le cas GAGNANT OU PERDANT OU NUL*/
+                if (validcoup && propCoup != CONT) {
+                    switch (propCoup)
+                    {
+                    case GAGNE :
+                        joueur2Nbperte++;
+                        joueur1Nbgagne++;
+                        NbrePartie++;
+                        break;
+                    case PERDU :
+                        joueur1Nbperte++;
+                        joueur2Nbgagne++;
+                        NbrePartie++;
+                        break;
+                    case NULLE :
+                        joueur1NULLE++;
+                        joueur2NULLE++;
+                        NbrePartie++;
+                        break;
+                    default:
+                        break;
+                    }
+
+                }
+
+                if (validcoup && propCoup == CONT) {
+                    /* envoi de la requete au deuxieme joueur*/
+                    err = send(Trans2, &couprequete, sizeof(TCoupReq), 0);
+                    if (err <= 0) {
+                        perror("(serveur) erreur sur le send Trans2 \n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+                }
+                break;
+
+
+                /*
+                Code different de COUP
+                Cas d'erreur
+                */
+            default:
+                coupreponse.err = ERR_TYP;
+                err = send(Trans1, &coupreponse, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    perror("(serveur) erreur sur le send Trans1 \n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+                }
+                /*passage a la deuxieme partie*/
+                NbrePartie++;
+
+                break;
+            }
+            /*ne pas receptionner le coup de l'adversaire dans le cas de fin de partie*/
+            if (NbrePartie > 1) {
+                break;
+            }
+        }
 
 
 
+    }
 
 
 
