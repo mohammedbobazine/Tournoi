@@ -9,6 +9,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
+#include <stdbool.h>
 #include "../fonctions/headers/fonctionsTCP.h"
 
 #include "../headers/protocol.h"
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
     }
     portServeur = atoi(argv[1]);
 
-    printf("start serveur : %s num du port %d ...", argv[0], argv[1]);
+    printf("start serveur : %s num du port %s ...", argv[0], argv[1]);
 
     sizeAddr = sizeof(struct sockaddr_in);
    
@@ -79,8 +80,8 @@ int main(int argc, char** argv) {
     socket de transmission pour le deuxieme joueur 
     */
     Trans2 = accept(sockConx, NULL, NULL);
-    if (Trans < 0) {
-        printf("(serveur) erreur sur le accept 2eme joueur \n")
+    if (Trans2 < 0) {
+        printf("(serveur) erreur sur le accept 2eme joueur \n");
     }
 
     /* remetre a zero */
@@ -129,7 +130,7 @@ int main(int argc, char** argv) {
         FD_SET(Trans1, &readSet);
         FD_SET(Trans2, &readSet);
 
-        if (FD_ISSET(Trans1, &readSet) != && NORecu1) {
+        if (FD_ISSET(Trans1, &readSet) !=0 && NORecu1) {
 
             /*
             reception du code de la requete avec MSG_PEEK
@@ -163,7 +164,7 @@ int main(int argc, char** argv) {
 
         }
 
-        if (FD_ISSET(Trans2, &readSet) != && NORecu2) {
+        if (FD_ISSET(Trans2, &readSet) !=0 && NORecu2) {
 
                  /*
             reception du code de la requete avec MSG_PEEK

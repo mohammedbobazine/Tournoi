@@ -15,8 +15,8 @@ clean:
 
 all: serveurDejeu
 
-serveurDejeul: src/serveurDejeu.c fonctionsTCP 
-	gcc src/serveurDejeu.c -o bin/serveurDejeu bin/fonctionsTCP.o  $(LD_FLAGS)
+serveurGame: src/serveurGame.c fonctionsTCP 
+	gcc src/serveurGame.c -o bin/serveurGame bin/fonctionsTCP.o  $(LD_FLAGS)
 
 fonctionsTCP: fonctions/src/fonctionsTCP.c fonctions/headers/fonctionsTCP.h
 	gcc -c -o bin/fonctionsTCP.o fonctions/src/fonctionsTCP.c
