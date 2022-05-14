@@ -14,7 +14,7 @@
 #include "time.h"
 
 #include "../headers/protocol.h"
-#include "../headers/validation.h"
+#include "../fonctions/headers/validation.h"
 
 /************************
 *
@@ -38,13 +38,9 @@ int main(int argc, char** argv) {
     int Trans1;
     int Trans2;
 
-
-
     fd_set readSet;
 
     int nfsd = 6;
-
-
 
     /*
     * verification des arguments
@@ -57,8 +53,6 @@ int main(int argc, char** argv) {
     }
     portServeur = atoi(argv[1]);
 
-    printf("start serveur : %s num du port %s ...", argv[0], argv[1]);
-
     sizeAddr = sizeof(struct sockaddr_in);
    
    /*
@@ -68,7 +62,7 @@ int main(int argc, char** argv) {
     if (sockConx < 0) {
         return -1;
     }
-
+    printf("start serveur : %s num du port %s ...\n", argv[0], argv[1]);
     /*
     socket de transmission pour le premier joueur a ce connecter 
     */
@@ -232,7 +226,7 @@ int main(int argc, char** argv) {
 
     int NbrePartie = 1;//numero de la partie
     initialiserPartie();
-    printf("----------- Debut de la premier partie ---------------\n6|\n|\n|\n|\n|-------------------------------------------------------- \n");
+    printf("Debut de la premier partie \n");
     
     
     int theTime;
@@ -496,7 +490,7 @@ int main(int argc, char** argv) {
 
 
                     if (validation2 == true && propCoup != CONT) {
-                        switch (propCoup){
+                switch (propCoup){
                 case  PERDU:
                     joueur1Nbgagne++;
                     joueur2Nbperte++;

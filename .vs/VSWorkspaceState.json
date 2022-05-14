@@ -1,6 +1,10 @@
 {
   "ExpandedNodes": [
     "",
+    "\\fonctions",
+    "\\fonctions\\headers",
+    "\\fonctions\\src",
+    "\\headers",
     "\\src"
   ],
   "PreviewInSolutionExplorer": false
