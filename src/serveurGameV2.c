@@ -156,6 +156,7 @@ int main(int argc, char** argv) {
         printf("usage : ./serveur [--noValid|--noTimeout] no_port\n");
         return -2;
     }
+    
     //affichage des argument de demarage
     verifArgum(validation, timeout, port);
 
@@ -227,6 +228,372 @@ int main(int argc, char** argv) {
     }
     // quelque problemes dans les parametres reverifier
     selectioPartie(&reponsePartie1, &reponsePartie2, Trans1, Trans2, &joueur1, &joueur2);
+
+    memcpy(reponsePartie1.nomAdvers, joueur1, TNOM);
+    memcpy(reponsePartie2.nomAdvers, joueur2, TNOM);
+
+
+    err = send(Trans1, &reponsePartie1, sizeof(TPartieRep), 0);
+    if (err <= 0) {
+        perror("erreur : sur le send de reponsPartie1 sur Trans1\n");
+        shutdown(Trans1, SHUT_RDWR);
+        close(Trans1);
+        return -5;
+
+    }
+    err = send(Trans2, &reponsePartie2, sizeof(TPartieRep), 0);
+    if (err <= 0) {
+        perror("erreur : sur le send de reponsPartie 2 sur Trans 2\n");
+        shutdown(Trans2, SHUT_RDWR);
+        close(Trans2);
+        return -5;
+
+    }
+
+    /*******************************  PARTIE I :********************************/
+    
+    initialiserPartie();
+    printf("Arbitre : partie I \n joueur 1 : %s PION [BLANC] \njoueur 2 : %s PION [NOIR] \nAttente du COUP du joueur 1...\n",joueur1,joueur2);
+
+    while (NBpartie == 1) {
+        if (timeout) {
+            //config du timeout
+            struct timeval tval1;
+            tval1.tv_sec = TIME_MAX;
+            tval1.tv_usec = 0;
+            FD_ZERO(&readSet1);
+            FD_SET(Trans1, &readSet1);
+
+            TheTime = select(Trans1 + 1, &readSet1, NULL, NULL, &tval1);
+        }
+        if(!timeout || (TheTime >0 && timeout)){
+            err = recv(Trans1, &idrequete, sizeof(TIdRequest), MSG_PEEK);
+            if (err <= 0) {
+                perror("erreur : sur le recv de idrequete  sur Trans 1\n");
+                shutdown(Trans1, SHUT_RDWR);
+                close(Trans1);
+                return -5;
+            }
+            switch (idrequete)
+            {
+            case COUP:
+                err = recv(Trans1, &requetecoup, sizeof(TCoupReq), 0);
+                if (err <= 0) {
+                    perror("erreur : sur le recv de requeteCoup  sur Trans 1\n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+                }
+                printf("Arbitre : reception du [COUP] du joueur 1\n");
+                bool coupValid = validationCoup(1, requetecoup, &propCoup);
+                
+                // A revoir validation !!
+                if (validation && coupValid == false) {
+                    reponsecoup.err = ERR_COUP;
+                    reponsecoup.validCoup = TRICHE;
+                    reponsecoup.propCoup = PERDU;
+                    err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        perror("erreur : sur le send de [ERR_COUP]  sur Trans 1\n");
+                        shutdown(Trans1, SHUT_RDWR);
+                        close(Trans1);
+                        return -5;
+                    }
+                    err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        perror("erreur : sur le send de [ERR_COUP]  sur Trans 2\n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+                    joueur1Nbperte++;
+                    joueur2Nbgagne++;
+                    NBpartie++;
+                    break;
+                }
+                else {
+                    printf("Arbitre: validation du [COUP] du joueur 1\n");
+                    reponsecoup.err = ERR_OK;
+                    reponsecoup.propCoup = propCoup;
+                    reponsecoup.validCoup = VALID;
+                }
+                err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    perror("erreur : sur le send de propCoup  sur Trans 1\n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+                }
+                err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    perror("erreur : sur le send de propCoup  sur Trans 2\n");
+                    shutdown(Trans2, SHUT_RDWR);
+                    close(Trans2);
+                    return -5;
+                }
+
+                if (coupValid == true && propCoup != COUP) {
+                    switch (propCoup)
+                    {
+                    case GAGNE:
+                        joueur1Nbgagne++;
+                        joueur2Nbperte++;
+                        NBpartie++;
+                        break;
+                    case NULLE:
+                        joueur1Nulle++;
+                        joueur2Nulle++;
+                        NBpartie++;
+                        break;
+                    case PERDU:
+                        joueur2Nbgagne++;
+                        joueur1Nbperte++;
+                        NBpartie++;
+                        break;
+                    default:
+                        break;
+                    }
+                }
+                if ((coupValid == true ) || ( !validation)) {
+                    err = send(Trans2, &requetecoup, sizeof(TCoupReq), 0);
+                    if (err <= 0) {
+                        perror("erreur : sur le send de requete sur Trans 2\n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+                    printf("Arbitre : envoi a l'adversaire..\n");
+                }
+                break;
+
+            default:
+
+                reponsecoup.err = ERR_TYP;
+                err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    perror("erreur : sur le send de [ERR_TYP]  sur Trans 1\n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+
+                }
+                joueur1Nbperte++;
+                joueur2Nbgagne++;
+                NBpartie++;
+                break;
+            }
+            if (NBpartie != 1) {
+                break;
+            }
+
+            /*++++++ COUP JOUEUR 2++++++*/
+
+            if (timeout) {
+                //config du timeout
+                struct timeval tval2;
+                tval2.tv_sec = TIME_MAX;
+                tval2.tv_usec = 0;
+                FD_ZERO(&readSet1);
+                FD_SET(Trans2, &readSet1);
+
+                TheTime = select(Trans2 + 1, &readSet1, NULL, NULL, &tval2);
+            }
+            if ((TheTime > 0 && timeout) || !timeout) {
+                
+                err = recv(Trans2, &idrequete, sizeof(TIdRequest), MSG_PEEK);
+                if (err <= 0) {
+                    printf("erreur: sur le recv idrequete sur Trans2\n");
+                    shutdown(Trans2, SHUT_RDWR);
+                    close(Trans2);
+                    return -5;
+                }
+                switch (idrequete)
+                {
+                case COUP:
+                    err = recv(Trans2, &requetecoup, sizeof(TCoupReq), 0);
+                    
+                    if (err <= 0) {
+                        printf("erreur: sur le recv requetecoup sur Trans2\n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+
+                    printf("Arbitre : reception du [COUP] de la par du joueur 2\n");
+                    bool coupvValid = validationCoup(2, requetecoup, &propCoup);
+
+                    if (validation && coupvValid == false) {
+                       
+                        reponsecoup.err = ERR_COUP;
+                        reponsecoup.propCoup = PERDU;
+                        reponsecoup.validCoup = TRICHE;
+                        
+                        err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+                        if (err <= 0) {
+                            printf("erreur: sur le send reponsecoup [ERR_COUP] sur Trans2\n");
+                            shutdown(Trans2, SHUT_RDWR);
+                            close(Trans2);
+                            return -5;
+                        }
+
+                        err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+                        if (err <= 0) {
+                            printf("erreur: sur le send reponsecoup [ERR_COUP] sur Trans1\n");
+                            shutdown(Trans1, SHUT_RDWR);
+                            close(Trans1);
+                            return -5;
+                        }
+                        joueur2Nbperte++;
+                        joueur1Nbgagne++;
+                        NBpartie++;
+                        break;
+
+                    }
+                    else {
+                        printf("Arbitre : validation du [COUP] du joueur2\n");
+                        reponsecoup.err = ERR_OK;
+                        reponsecoup.propCoup = propCoup;
+                        reponsecoup.validCoup = VALID;
+                    }
+
+                    err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        printf("erreur: sur le send reponsecoup [VALID] sur Trans2\n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+
+                    err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        printf("erreur: sur le send reponsecoup [VALID] sur Trans1\n");
+                        shutdown(Trans1, SHUT_RDWR);
+                        close(Trans1);
+                        return -5;
+                    }
+
+                    if (coupvValid == true && propCoup != CONT) {
+                        switch (propCoup)
+                        {
+                        case GAGNE:
+                            joueur2Nbgagne++;
+                            joueur1Nbperte++;
+                            NBpartie++;
+                            break;
+                        case PERDU:
+                            joueur1Nbgagne++;
+                            joueur2Nbperte++;
+                            NBpartie++;
+                            break;
+                        case NULLE:
+                            joueur1Nulle++;
+                            joueur2Nulle++;
+                            NBpartie++;
+                            break;
+
+                        default:
+                            break;
+                        }
+                    }
+                    /*!!! a revoir la condition */
+                    if ((coupvValid == true && propCoup == CONT) || (!validation && propCoup == CONT)) {
+                        printf("Arbitre : envoi [COUP] a l'adrversaire joueur1 \n");
+                        err = send(Trans1, &requetecoup, sizeof(TCoupReq), 0);
+                        if (err <= 0) {
+                            printf("erreur: sur le send requetecoup [COUP] sur Trans2\n");
+                            shutdown(Trans1, SHUT_RDWR);
+                            close(Trans1);
+                            return -5;
+                        }
+                    }
+                    break;
+
+
+                default:
+                    reponsecoup.err = ERR_TYP;
+                    err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        printf("erreur: sur le send reponsecoup [ERR_TYP] sur Trans2\n");
+                        shutdown(Trans2, SHUT_RDWR);
+                        close(Trans2);
+                        return -5;
+                    }
+                    err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+                    if (err <= 0) {
+                        printf("erreur: sur le send reponsecoup [ERR_TYP] sur Trans1\n");
+                        shutdown(Trans1, SHUT_RDWR);
+                        close(Trans1);
+                        return -5;
+                    }
+                    joueur1Nbgagne++;
+                    joueur2Nbperte++;
+                    NBpartie++;
+
+                    break;
+                }
+            }
+
+            if (TheTime == 0 && timeout) {
+                printf("Arbitre: fin d'attent pour le joueur 2\nfin de partie 1\n");
+                reponsecoup.err = ERR_COUP;
+                reponsecoup.propCoup = PERDU;
+                reponsecoup.validCoup = TIMEOUT;
+
+                err = send(Trans1, &reponsecoup, sizeof(TCoupRep),0);
+                if (err <= 0) {
+                    printf("erreur: sur le send reponsecoup [TIMEOUT] sur Trans1\n");
+                    shutdown(Trans1, SHUT_RDWR);
+                    close(Trans1);
+                    return -5;
+                }
+                err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+                if (err <= 0) {
+                    printf("erreur: sur le send reponsecoup [TIMEOUT] sur Trans2\n");
+                    shutdown(Trans2, SHUT_RDWR);
+                    close(Trans2);
+                    return -5;
+                }
+                joueur1Nbgagne++;
+                joueur2Nbperte++;
+                NBpartie++;
+                printf("Arbitre :%s  a perdu la premier partie\n", joueur2);
+                break;
+
+            }
+         }
+
+         if (TheTime == 0 && timeout) {
+
+             printf("Arbitre: fin d'attent pour le joueur 1\nfin de partie 1\n");
+             reponsecoup.err = ERR_COUP;
+             reponsecoup.propCoup = PERDU;
+             reponsecoup.validCoup = TIMEOUT;
+
+             err = send(Trans1, &reponsecoup, sizeof(TCoupRep), 0);
+             if (err <= 0) {
+                 printf("erreur: sur le send reponsecoup [TIMEOUT] sur Trans1\n");
+                 shutdown(Trans1, SHUT_RDWR);
+                 close(Trans1);
+                 return -5;
+             }
+             err = send(Trans2, &reponsecoup, sizeof(TCoupRep), 0);
+             if (err <= 0) {
+                 printf("erreur: sur le send reponsecoup [TIMEOUT] sur Trans2\n");
+                 shutdown(Trans2, SHUT_RDWR);
+                 close(Trans2);
+                 return -5;
+             }
+             joueur1Nbperte++;
+             joueur2Nbgagne++;
+             NBpartie++;
+             printf("Arbitre :%s  a perdu la premier partie\n", joueur1);
+             break;
+         }
+    }
+
+    /*++++++++ FIN PARTIE I +++++++++ */
+
+    /*++++++++  PARTIE II  ++++++++++*/
 
 
 
