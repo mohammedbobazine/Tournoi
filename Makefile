@@ -24,6 +24,4 @@ serveurGameV2: src/serveurGameV2.c fonctionsTCP
 fonctionsTCP: fonctions/src/fonctionsTCP.c fonctions/headers/fonctionsTCP.h
 	gcc -c -o bin/fonctionsTCP.o fonctions/src/fonctionsTCP.c
 
-fonctionsUDP: fonctions/src/fonctionsUDP.c fonctions/headers/fonctionsUDP.h
-	gcc -c -o bin/fonctionsUDP.o fonctions/src/fonctionsUDP.c
 
